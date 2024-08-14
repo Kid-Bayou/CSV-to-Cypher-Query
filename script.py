@@ -9,7 +9,9 @@ def detect_encoding(file_path):
     return result['encoding']
 
 def escape_quotes(text):
-    return text.replace("'", "\\'")
+    text = text.replace('"', '\\"')
+    text = text.replace("'", "\\'")
+    return text
 
 def normalize_text(text):
     text = unicodedata.normalize('NFKD', text)
@@ -23,15 +25,19 @@ def generate_cypher_queries(csv_file_path):
 
     node_queries = []
     relationship_queries = []
+    node_counter = 0
 
     with open(csv_file_path, mode='r', newline='', encoding=encoding) as csvfile:
         reader = csv.DictReader(csvfile)
 
         for row in reader:
+            node_counter += 1
+            var_s = f's{node_counter}'
+
             title = escape_quotes(normalize_text(row['title']))
 
             node_query = (
-                f'CREATE (s:Show {{id: "{row["show_id"]}", type: "{row["type"]}", title: "{title}", '
+                f'CREATE ({var_s}:Show {{id: "{row["show_id"]}", type: "{row["type"]}", title: "{title}", '
                 f'release_year: {row["release_year"]}, rating: "{row["rating"]}", '
                 f'duration: "{row["duration"]}"}})'
             )
@@ -39,37 +45,41 @@ def generate_cypher_queries(csv_file_path):
 
             if row['director']:
                 directors = row['director'].split(', ')
-                for director in directors:
+                for i, director in enumerate(directors):
+                    var_d = f'd{node_counter}_{i}'
                     director_query = (
-                        f'MERGE (d:Director {{name: "{escape_quotes(director)}"}})\n'
-                        f'MERGE (d)-[:DIRECTS]->(s)'
+                        f'MERGE ({var_d}:Director {{name: "{escape_quotes(director)}"}})\n'
+                        f'MERGE ({var_d})-[:DIRECTS]->({var_s})'
                     )
                     relationship_queries.append(director_query)
 
             if row['cast']:
                 cast_members = row['cast'].split(', ')
-                for cast_member in cast_members:
+                for i, cast_member in enumerate(cast_members):
+                    var_a = f'a{node_counter}_{i}'
                     cast_query = (
-                        f'MERGE (a:Actor {{name: "{escape_quotes(cast_member)}"}})\n'
-                        f'MERGE (a)-[:ACTS_IN]->(s)'
+                        f'MERGE ({var_a}:Actor {{name: "{escape_quotes(cast_member)}"}})\n'
+                        f'MERGE ({var_a})-[:ACTS_IN]->({var_s})'
                     )
                     relationship_queries.append(cast_query)
 
             if row['country']:
                 countries = row['country'].split(', ')
-                for country in countries:
+                for i, country in enumerate(countries):
+                    var_c = f'c{node_counter}_{i}'
                     country_query = (
-                        f'MERGE (c:Country {{name: "{escape_quotes(country)}"}})\n'
-                        f'MERGE (s)-[:PRODUCED_IN]->(c)'
+                        f'MERGE ({var_c}:Country {{name: "{escape_quotes(country)}"}})\n'
+                        f'MERGE ({var_s})-[:PRODUCED_IN]->({var_c})'
                     )
                     relationship_queries.append(country_query)
 
             if row['listed_in']:
                 genres = row['listed_in'].split(', ')
-                for genre in genres:
+                for i, genre in enumerate(genres):
+                    var_g = f'g{node_counter}_{i}'
                     genre_query = (
-                        f'MERGE (g:Genre {{name: "{escape_quotes(genre)}"}})\n'
-                        f'MERGE (s)-[:LISTED_IN]->(g)'
+                        f'MERGE ({var_g}:Genre {{name: "{escape_quotes(genre)}"}})\n'
+                        f'MERGE ({var_s})-[:LISTED_IN]->({var_g})'
                     )
                     relationship_queries.append(genre_query)
 
